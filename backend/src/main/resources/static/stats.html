@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ENTANGLE - Stats Dashboard</title>
+</head>
+<body>
+
+<h2>ENTANGLE - Communication Analytics Dashboard</h2>
+
+<button onclick="loadStats()">Refresh Stats</button>
+
+<div id="statsBox" style="margin-top:20px; border:1px solid black; padding:15px; width:500px;"></div>
+
+<script>
+    async function loadStats() {
+        const response = await fetch('/stats');
+        const data = await response.json();
+
+        displayStats(data);
+    }
+
+    function displayStats(data) {
+        let html = "";
+
+        html += "<h3>System Metrics</h3>";
+
+        html += "<b>Total Messages:</b> " + data.totalMessages + "<br><br>";
+        html += "<b>Priority Messages:</b> " + data.priorityMessages + "<br><br>";
+        html += "<b>Verified Messages:</b> " + data.verifiedMessages + "<br><br>";
+        html += "<b>Tampered Messages:</b> " + data.tamperedMessages + "<br><br>";
+        html += "<b>Join Events:</b> " + data.joinEvents + "<br><br>";
+        html += "<b>Leave Events:</b> " + data.leaveEvents + "<br><br>";
+
+        const integrityRate = data.totalMessages === 0 
+            ? 0 
+            : ((data.verifiedMessages / data.totalMessages) * 100).toFixed(2);
+
+        html += "<b>Integrity Success Rate:</b> " + integrityRate + "%<br><br>";
+
+        if (data.tamperedMessages > 0) {
+            html += "<b style='color:red;'>⚠ Security Alert: Tampered messages detected</b>";
+        } else {
+            html += "<b style='color:green;'>✔ All communications secure</b>";
+        }
+
+        document.getElementById("statsBox").innerHTML = html;
+    }
+
+    // auto load on open
+    loadStats();
+</script>
+
+</body>
+</html>

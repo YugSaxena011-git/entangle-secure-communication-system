@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ENTANGLE - Secure Chat</title>
+</head>
+<body>
+
+<h2>ENTANGLE - Secure Chat</h2>
+
+<div style="margin-bottom: 15px;">
+    <input type="text" id="sender" placeholder="Your Name">
+    <input type="text" id="roomId" placeholder="Room ID (example: quantum-room)">
+    <input type="password" id="secretKey" placeholder="Shared Secret Key">
+    <button onclick="joinChat()" id="joinBtn">Join Chat</button>
+</div>
+
+<div style="margin-bottom: 15px;">
+    <input type="text" id="message" placeholder="Message" disabled style="width: 280px;">
+    <label style="margin-left:10px;">
+        <input type="checkbox" id="priorityCheck"> Priority
+    </label>
+    <label style="margin-left:10px;">
+        <input type="checkbox" id="tamperCheck"> Tamper Mode
+    </label>
+    <button onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+</div>
+
+<div style="border:1px solid black; width: 760px; height: 380px; padding: 10px; overflow-y: auto;" id="chatBox">
+    <ul id="chat" style="list-style-type:none; padding-left:0; margin:0;"></ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
+
+<script>
+    let stompClient = null;
+    let connected = false;
+    let joinedSuccessfully = false;
+    let currentRoom = "";
+    let currentSecretKey = "";
+    let currentSender = "";
+
+    function prefillFromQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        const roomId = params.get("roomId");
+        const secretKey = params.get("secretKey");
+
+        if (roomId) {
+            document.getElementById("roomId").value = roomId;
+        }
+
+        if (secretKey) {
+            document.getElementById("secretKey").value = secretKey;
+        }
+    }
+
+    function loadHistory(roomId) {
+        fetch(`/history?roomId=${encodeURIComponent(roomId)}`)
+            .then(response => response.json())
+            .then(data => {
+                const chat = document.getElementById('chat');
+                chat.innerHTML = "";
+
+                data.forEach(msg => {
+                    showHistoryMessage(msg);
+                });
+
+                const chatBox = document.getElementById('chatBox');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(error => {
+                console.error("Error loading history:", error);
+            });
+    }
+
+    function connect(callback) {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function () {
+            connected = true;
+
+            stompClient.subscribe('/topic/messages', function (msg) {
+                const message = JSON.parse(msg.body);
+                if (message && message.roomId === currentRoom) {
+                    showMessage(message);
+                }
+            });
+
+            if (callback) callback();
+        });
+    }
+
+    function joinChat() {
+        const sender = document.getElementById('sender').value.trim();
+        const roomIdInput = document.getElementById('roomId').value.trim();
+        const secretKeyInput = document.getElementById('secretKey').value.trim();
+
+        if (!sender) {
+            alert("Please enter your name");
+            return;
+        }
+
+        if (!secretKeyInput) {
+            alert("Please enter the shared secret key");
+            return;
+        }
+
+        currentSender = sender;
+        currentRoom = roomIdInput ? roomIdInput : "general";
+        currentSecretKey = secretKeyInput;
+
+        if (connected) return;
+
+        connect(function () {
+            stompClient.send("/app/addUser", {}, JSON.stringify({
+                sender: currentSender,
+                roomId: currentRoom,
+                secretKey: currentSecretKey,
+                type: "JOIN"
+            }));
+        });
+    }
+
+    async function sha256(text) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function buildIntegrityBase(sender, content, roomId, type, secretKey) {
+        return sender + "|" + content + "|" + roomId + "|" + type + "|" + secretKey;
+    }
+
+    async function sendMessage() {
+        const sender = document.getElementById('sender').value.trim();
+        const content = document.getElementById('message').value.trim();
+        const isPriority = document.getElementById('priorityCheck').checked;
+        const tamperMode = document.getElementById('tamperCheck').checked;
+
+        if (!connected || !joinedSuccessfully) {
+            alert("Join chat first");
+            return;
+        }
+
+        if (!content) return;
+
+        const messageType = isPriority ? "PRIORITY" : "CHAT";
+
+        const baseString = buildIntegrityBase(sender, content, currentRoom, messageType, currentSecretKey);
+        let integrityHash = await sha256(baseString);
+
+        if (tamperMode) {
+            integrityHash = integrityHash.substring(0, integrityHash.length - 1) + "x";
+        }
+
+        stompClient.send("/app/sendMessage", {}, JSON.stringify({
+            sender: sender,
+            content: content,
+            roomId: currentRoom,
+            type: messageType,
+            integrityHash: integrityHash,
+            secretKey: currentSecretKey
+        }));
+
+        document.getElementById('message').value = "";
+        document.getElementById('priorityCheck').checked = false;
+        document.getElementById('tamperCheck').checked = false;
+    }
+
+    function enableChatAfterJoin() {
+        document.getElementById('message').disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        document.getElementById('sender').disabled = true;
+        document.getElementById('roomId').disabled = true;
+        document.getElementById('secretKey').disabled = true;
+        document.getElementById('joinBtn').disabled = true;
+    }
+
+    function showHistoryMessage(message) {
+        const chat = document.getElementById('chat');
+        const li = document.createElement('li');
+
+        li.style.marginBottom = "10px";
+        li.style.padding = "8px";
+        li.style.borderBottom = "1px solid #ddd";
+        li.style.opacity = "0.85";
+
+        if (message.type === "PRIORITY") {
+            li.textContent =
+                "[" + message.timestamp + "] [PRIORITY] " +
+                message.sender + ": " + message.content +
+                " | Integrity: " + message.integrityStatus;
+            li.style.color = "darkred";
+            li.style.fontWeight = "bold";
+            li.style.backgroundColor = "#ffe6e6";
+            li.style.border = "2px solid red";
+        } else {
+            li.textContent =
+                "[" + message.timestamp + "] [CHAT] " +
+                message.sender + ": " + message.content +
+                " | Integrity: " + message.integrityStatus;
+
+            if (message.integrityStatus === "VERIFIED") {
+                li.style.color = "green";
+            } else if (message.integrityStatus === "TAMPERED") {
+                li.style.color = "red";
+                li.style.fontWeight = "bold";
+                li.style.backgroundColor = "#fff0f0";
+            }
+        }
+
+        chat.appendChild(li);
+    }
+
+    function showMessage(message) {
+        const isOwnMessage = message.sender === currentSender;
+
+        if (message.integrityStatus === "DENIED" && isOwnMessage) {
+            joinedSuccessfully = false;
+            alert(message.content);
+            return;
+        }
+
+        if (message.integrityStatus === "JOIN_LOCKED" && isOwnMessage) {
+            joinedSuccessfully = false;
+            alert(message.content);
+            return;
+        }
+
+        if (message.type === "JOIN" && isOwnMessage) {
+            joinedSuccessfully = true;
+            loadHistory(currentRoom);
+            enableChatAfterJoin();
+        }
+
+        const chat = document.getElementById('chat');
+        const li = document.createElement('li');
+
+        li.style.marginBottom = "10px";
+        li.style.padding = "8px";
+        li.style.borderBottom = "1px solid #ddd";
+
+        if (message.type === "JOIN") {
+            li.textContent = "[" + message.timestamp + "] [JOIN] " + message.content;
+            li.style.color = "blue";
+            li.style.fontStyle = "italic";
+        } else if (message.type === "LEAVE") {
+            li.textContent = "[" + message.timestamp + "] [LEAVE] " + message.content;
+            li.style.color = "red";
+            li.style.fontStyle = "italic";
+        } else if (message.integrityStatus === "JOIN_LOCKED") {
+            li.textContent = "[" + message.timestamp + "] [ALERT] " + message.content;
+            li.style.color = "orange";
+            li.style.fontWeight = "bold";
+            li.style.backgroundColor = "#fff3cd";
+        } else if (message.integrityStatus === "DENIED") {
+            li.textContent = "[" + message.timestamp + "] [DENIED] " + message.content;
+            li.style.color = "red";
+            li.style.fontWeight = "bold";
+            li.style.backgroundColor = "#fff0f0";
+        } else if (message.type === "PRIORITY") {
+            li.textContent =
+                "[" + message.timestamp + "] [PRIORITY] " +
+                message.sender + ": " + message.content +
+                " | Integrity: " + message.integrityStatus;
+            li.style.color = "darkred";
+            li.style.fontWeight = "bold";
+            li.style.backgroundColor = "#ffe6e6";
+            li.style.border = "2px solid red";
+        } else {
+            li.textContent =
+                "[" + message.timestamp + "] [CHAT] " +
+                message.sender + ": " + message.content +
+                " | Integrity: " + message.integrityStatus;
+
+            if (message.integrityStatus === "VERIFIED") {
+                li.style.color = "green";
+            } else if (message.integrityStatus === "TAMPERED") {
+                li.style.color = "red";
+                li.style.fontWeight = "bold";
+                li.style.backgroundColor = "#fff0f0";
+            }
+        }
+
+        chat.appendChild(li);
+        const chatBox = document.getElementById('chatBox');
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    window.addEventListener("beforeunload", function () {
+        const sender = document.getElementById('sender').value.trim();
+
+        if (stompClient && connected && joinedSuccessfully && sender) {
+            stompClient.send("/app/addUser", {}, JSON.stringify({
+                sender: sender,
+                roomId: currentRoom,
+                secretKey: currentSecretKey,
+                type: "LEAVE"
+            }));
+        }
+    });
+
+    document.getElementById('message').addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    prefillFromQueryParams();
+</script>
+
+</body>
+</html>

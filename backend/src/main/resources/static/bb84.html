@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ENTANGLE - BB84 Simulation</title>
+</head>
+<body>
+
+<h2>ENTANGLE - BB84 Quantum Key Distribution</h2>
+
+<div style="margin-bottom: 15px;">
+    <input type="number" id="bits" placeholder="Number of bits (e.g. 12)">
+    <input type="text" id="roomName" placeholder="Room Name (e.g. quantum-room)">
+    <label>
+        <input type="checkbox" id="eavesdropper"> Eavesdropper Present
+    </label>
+    <button onclick="runSimulation()">Run Simulation</button>
+</div>
+
+<div id="result" style="border:1px solid black; padding:10px; width:850px;"></div>
+
+<script>
+    let latestGeneratedKey = "";
+    let latestRoomName = "";
+
+    async function runSimulation() {
+        const bits = document.getElementById('bits').value || 12;
+        const eavesdropper = document.getElementById('eavesdropper').checked;
+
+        latestRoomName = document.getElementById('roomName').value.trim() || "general";
+
+        const url = `/quantum/bb84?bits=${bits}&eavesdropper=${eavesdropper}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        latestGeneratedKey = data.generatedRoomKey || "";
+        displayResult(data);
+    }
+
+    function copyRoomKey() {
+        const roomKeyField = document.getElementById("generatedRoomKey");
+        roomKeyField.select();
+        roomKeyField.setSelectionRange(0, 99999);
+        document.execCommand("copy");
+        alert("Room key copied");
+    }
+
+    function openChatPage() {
+        if (!latestGeneratedKey) {
+            alert("Run BB84 simulation first");
+            return;
+        }
+
+        const url = `/index.html?roomId=${encodeURIComponent(latestRoomName)}&secretKey=${encodeURIComponent(latestGeneratedKey)}`;
+        window.open(url, "_blank");
+    }
+
+    function displayResult(data) {
+        let html = "";
+
+        html += "<h3>Simulation Result</h3>";
+
+        html += "<b>Alice Bits:</b> " + data.aliceBits.join(" ") + "<br><br>";
+        html += "<b>Alice Bases:</b> " + data.aliceBases.join(" ") + "<br><br>";
+        html += "<b>Bob Bases:</b> " + data.bobBases.join(" ") + "<br><br>";
+        html += "<b>Bob Measurements:</b> " + data.bobMeasurements.join(" ") + "<br><br>";
+        html += "<b>Shared Key:</b> " + data.sharedKey.join(" ") + "<br><br>";
+
+        html += "<b>Generated Room Key:</b><br>";
+        html += "<input type='text' id='generatedRoomKey' value='" + data.generatedRoomKey + "' readonly style='width:300px; font-weight:bold; color:purple;'>";
+        html += "<button onclick='copyRoomKey()' style='margin-left:10px;'>Copy Key</button>";
+        html += "<button onclick='openChatPage()' style='margin-left:10px;'>Open Chat</button><br><br>";
+
+        html += "<b>Selected Room Name:</b> " + latestRoomName + "<br><br>";
+        html += "<b>Matched Basis Count:</b> " + data.matchedBasisCount + "<br><br>";
+        html += "<b>Key Match Rate:</b> " + data.keyMatchRate.toFixed(2) + "%<br><br>";
+
+        if (data.eavesdroppingDetected) {
+            html += "<b style='color:red;'>⚠ Eavesdropping Detected</b><br><br>";
+            html += "<b style='color:red;'>Do NOT use this key for secure room communication.</b>";
+        } else {
+            html += "<b style='color:green;'>✔ Secure Communication</b><br><br>";
+            html += "<b style='color:green;'>This generated room key can be used in ENTANGLE chat.</b>";
+        }
+
+        document.getElementById("result").innerHTML = html;
+    }
+</script>
+
+</body>
+</html>
