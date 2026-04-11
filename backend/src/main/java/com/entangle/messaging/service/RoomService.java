@@ -1,6 +1,5 @@
 package com.entangle.messaging.service;
 
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
@@ -11,24 +10,20 @@ public class RoomService {
     private final ConcurrentHashMap<String, String> roomSecrets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> suspiciousAttempts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> joinLockedRooms = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Set<String>> activeMembers = new ConcurrentHashMap<>();
 
     private static final int MAX_SUSPICIOUS_ATTEMPTS = 3;
 
-    public synchronized JoinResult joinRoom(String roomId, String sender, String secretKey) {
+    public synchronized JoinResult joinRoom(String roomId, String secretKey) {
         if (!roomSecrets.containsKey(roomId)) {
             roomSecrets.put(roomId, secretKey);
             suspiciousAttempts.put(roomId, 0);
             joinLockedRooms.put(roomId, false);
-            activeMembers.put(roomId, ConcurrentHashMap.newKeySet());
-            activeMembers.get(roomId).add(sender);
             return JoinResult.ALLOWED;
         }
 
         boolean correctKey = roomSecrets.get(roomId).equals(secretKey);
 
         if (correctKey) {
-            activeMembers.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(sender);
             return JoinResult.ALLOWED;
         }
 
@@ -41,25 +36,22 @@ public class RoomService {
         return JoinResult.DENIED;
     }
 
-    public synchronized AccessResult validateMessageAccess(String roomId, String sender, String secretKey) {
+    public synchronized AccessResult validateMessageAccess(String roomId, String secretKey) {
         if (!roomSecrets.containsKey(roomId)) {
             return AccessResult.DENIED;
         }
 
-        boolean isActiveMember = activeMembers.containsKey(roomId) && activeMembers.get(roomId).contains(sender);
+        if (isJoinLocked(roomId)) {
+            return AccessResult.DENIED;
+        }
+
         boolean correctKey = roomSecrets.get(roomId).equals(secretKey);
 
-        if (isActiveMember && correctKey) {
+        if (correctKey) {
             return AccessResult.ALLOWED;
         }
 
         return AccessResult.DENIED;
-    }
-
-    public synchronized void leaveRoom(String roomId, String sender) {
-        if (activeMembers.containsKey(roomId)) {
-            activeMembers.get(roomId).remove(sender);
-        }
     }
 
     public synchronized void registerTamperEvent(String roomId) {

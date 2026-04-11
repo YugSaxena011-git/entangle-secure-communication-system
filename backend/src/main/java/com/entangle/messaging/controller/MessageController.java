@@ -49,12 +49,15 @@ public class MessageController {
         String roomId = safeValue(message.getRoomId(), "general");
         String secretKey = safeTrim(message.getSecretKey());
 
-        RoomService.AccessResult accessResult = roomService.validateMessageAccess(roomId, sender, secretKey);
+        RoomService.AccessResult accessResult = roomService.validateMessageAccess(roomId, secretKey);
 
         if (accessResult != RoomService.AccessResult.ALLOWED) {
-            return buildSystemMessage(roomId, sender,
-                    "ACCESS DENIED: You are not an authenticated member of room [" + roomId + "]",
-                    "DENIED");
+            return buildSystemMessage(
+                    roomId,
+                    sender,
+                    "ACCESS DENIED: Wrong Secret Key for room [" + roomId + "]",
+                    "DENIED"
+            );
         }
 
         if (content.isEmpty()) {
@@ -121,21 +124,7 @@ public class MessageController {
         String roomId = safeValue(message.getRoomId(), "general");
         String secretKey = safeTrim(message.getSecretKey());
 
-        if (message.getType() == ChatMessage.MessageType.LEAVE) {
-            roomService.leaveRoom(roomId, sender);
-
-            message.setSender(sender);
-            message.setRoomId(roomId);
-            message.setTimestamp(LocalTime.now().format(formatter));
-            message.setIntegrityHash(null);
-            message.setSecretKey(null);
-            message.setIntegrityStatus("SYSTEM");
-            message.setContent(sender + " left room [" + roomId + "]");
-            chatStatsService.recordMessage(message);
-            return message;
-        }
-
-        RoomService.JoinResult joinResult = roomService.joinRoom(roomId, sender, secretKey);
+        RoomService.JoinResult joinResult = roomService.joinRoom(roomId, secretKey);
 
         if (joinResult == RoomService.JoinResult.JOIN_LOCKED) {
             return buildSystemMessage(
@@ -164,7 +153,11 @@ public class MessageController {
 
         if (message.getType() == ChatMessage.MessageType.JOIN) {
             message.setContent(sender + " joined room [" + roomId + "]");
-            chatStatsService.recordMessage(message);
+            return message;
+        }
+
+        if (message.getType() == ChatMessage.MessageType.LEAVE) {
+            message.setContent(sender + " left room [" + roomId + "]");
             return message;
         }
 
@@ -196,7 +189,11 @@ public class MessageController {
 
     private String safeValue(String value, String fallback) {
         String trimmed = safeTrim(value);
-        return trimmed.isEmpty() ? fallback : trimmed;
+        return trimmed.isEmpty() ? fallback : fallbackIfBlank(trimmed, fallback);
+    }
+
+    private String fallbackIfBlank(String value, String fallback) {
+        return value.isEmpty() ? fallback : value;
     }
 
     private String buildIntegrityBase(String sender, String content, String roomId, String type, String secretKey) {

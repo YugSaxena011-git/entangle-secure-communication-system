@@ -77,6 +77,7 @@
     function connect(callback) {
         const socket = new SockJS('/ws');
         stompClient = Stomp.over(socket);
+        stompClient.debug = null;
 
         stompClient.connect({}, function () {
             connected = true;
@@ -180,69 +181,17 @@
         document.getElementById('joinBtn').disabled = true;
     }
 
-    function showHistoryMessage(message) {
+    function appendMessageElement(message, faded = false) {
         const chat = document.getElementById('chat');
         const li = document.createElement('li');
 
         li.style.marginBottom = "10px";
         li.style.padding = "8px";
         li.style.borderBottom = "1px solid #ddd";
-        li.style.opacity = "0.85";
 
-        if (message.type === "PRIORITY") {
-            li.textContent =
-                "[" + message.timestamp + "] [PRIORITY] " +
-                message.sender + ": " + message.content +
-                " | Integrity: " + message.integrityStatus;
-            li.style.color = "darkred";
-            li.style.fontWeight = "bold";
-            li.style.backgroundColor = "#ffe6e6";
-            li.style.border = "2px solid red";
-        } else {
-            li.textContent =
-                "[" + message.timestamp + "] [CHAT] " +
-                message.sender + ": " + message.content +
-                " | Integrity: " + message.integrityStatus;
-
-            if (message.integrityStatus === "VERIFIED") {
-                li.style.color = "green";
-            } else if (message.integrityStatus === "TAMPERED") {
-                li.style.color = "red";
-                li.style.fontWeight = "bold";
-                li.style.backgroundColor = "#fff0f0";
-            }
+        if (faded) {
+            li.style.opacity = "0.85";
         }
-
-        chat.appendChild(li);
-    }
-
-    function showMessage(message) {
-        const isOwnMessage = message.sender === currentSender;
-
-        if (message.integrityStatus === "DENIED" && isOwnMessage) {
-            joinedSuccessfully = false;
-            alert(message.content);
-            return;
-        }
-
-        if (message.integrityStatus === "JOIN_LOCKED" && isOwnMessage) {
-            joinedSuccessfully = false;
-            alert(message.content);
-            return;
-        }
-
-        if (message.type === "JOIN" && isOwnMessage) {
-            joinedSuccessfully = true;
-            loadHistory(currentRoom);
-            enableChatAfterJoin();
-        }
-
-        const chat = document.getElementById('chat');
-        const li = document.createElement('li');
-
-        li.style.marginBottom = "10px";
-        li.style.padding = "8px";
-        li.style.borderBottom = "1px solid #ddd";
 
         if (message.type === "JOIN") {
             li.textContent = "[" + message.timestamp + "] [JOIN] " + message.content;
@@ -291,12 +240,39 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    window.addEventListener("beforeunload", function () {
-        const sender = document.getElementById('sender').value.trim();
+    function showHistoryMessage(message) {
+        appendMessageElement(message, true);
+    }
 
-        if (stompClient && connected && joinedSuccessfully && sender) {
+    function showMessage(message) {
+        const isOwnMessage = message.sender === currentSender;
+
+        if (message.integrityStatus === "DENIED" && isOwnMessage) {
+            joinedSuccessfully = false;
+            alert(message.content);
+            return;
+        }
+
+        if (message.integrityStatus === "JOIN_LOCKED" && isOwnMessage) {
+            joinedSuccessfully = false;
+            alert(message.content);
+            return;
+        }
+
+        if (message.type === "JOIN" && isOwnMessage && !joinedSuccessfully) {
+            joinedSuccessfully = true;
+            enableChatAfterJoin();
+            loadHistory(currentRoom);
+            return;
+        }
+
+        appendMessageElement(message, false);
+    }
+
+    window.addEventListener("beforeunload", function () {
+        if (stompClient && connected && joinedSuccessfully) {
             stompClient.send("/app/addUser", {}, JSON.stringify({
-                sender: sender,
+                sender: currentSender,
                 roomId: currentRoom,
                 secretKey: currentSecretKey,
                 type: "LEAVE"
