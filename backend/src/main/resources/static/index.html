@@ -55,23 +55,28 @@
         }
     }
 
-    function loadHistory(roomId) {
-        fetch(`/history?roomId=${encodeURIComponent(roomId)}`)
-            .then(response => response.json())
-            .then(data => {
-                const chat = document.getElementById('chat');
-                chat.innerHTML = "";
+    async function loadHistory(roomId) {
+        try {
+            const response = await fetch(`/history?roomId=${encodeURIComponent(roomId)}`);
+            if (!response.ok) {
+                throw new Error("History request failed");
+            }
 
+            const data = await response.json();
+            const chat = document.getElementById('chat');
+            chat.innerHTML = "";
+
+            if (Array.isArray(data)) {
                 data.forEach(msg => {
-                    showHistoryMessage(msg);
+                    appendMessageElement(msg, true);
                 });
+            }
 
-                const chatBox = document.getElementById('chatBox');
-                chatBox.scrollTop = chatBox.scrollHeight;
-            })
-            .catch(error => {
-                console.error("Error loading history:", error);
-            });
+            const chatBox = document.getElementById('chatBox');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        } catch (error) {
+            console.error("Error loading history:", error);
+        }
     }
 
     function connect(callback) {
@@ -93,7 +98,7 @@
         });
     }
 
-    function joinChat() {
+    async function joinChat() {
         const sender = document.getElementById('sender').value.trim();
         const roomIdInput = document.getElementById('roomId').value.trim();
         const secretKeyInput = document.getElementById('secretKey').value.trim();
@@ -114,7 +119,9 @@
 
         if (connected) return;
 
-        connect(function () {
+        connect(async function () {
+            await loadHistory(currentRoom);
+
             stompClient.send("/app/addUser", {}, JSON.stringify({
                 sender: currentSender,
                 roomId: currentRoom,
@@ -240,10 +247,6 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function showHistoryMessage(message) {
-        appendMessageElement(message, true);
-    }
-
     function showMessage(message) {
         const isOwnMessage = message.sender === currentSender;
 
@@ -262,8 +265,6 @@
         if (message.type === "JOIN" && isOwnMessage && !joinedSuccessfully) {
             joinedSuccessfully = true;
             enableChatAfterJoin();
-            loadHistory(currentRoom);
-            return;
         }
 
         appendMessageElement(message, false);

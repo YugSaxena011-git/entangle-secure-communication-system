@@ -3,7 +3,9 @@ package com.entangle.messaging.controller;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalTime;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -23,7 +25,7 @@ import com.entangle.messaging.stats.ChatStatsService;
 @Controller
 public class MessageController {
 
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final ChatStatsService chatStatsService;
     private final ChatMessageRepository chatMessageRepository;
     private final RoomService roomService;
@@ -64,10 +66,13 @@ public class MessageController {
             return null;
         }
 
+        long now = System.currentTimeMillis();
+
         message.setSender(sender);
         message.setContent(content);
         message.setRoomId(roomId);
-        message.setTimestamp(LocalTime.now().format(formatter));
+        message.setCreatedAtEpoch(now);
+        message.setTimestamp(formatTimestamp(now));
 
         if (message.getType() == ChatMessage.MessageType.PRIORITY) {
             message.setType(ChatMessage.MessageType.PRIORITY);
@@ -104,6 +109,7 @@ public class MessageController {
                         message.getContent(),
                         message.getRoomId(),
                         message.getTimestamp(),
+                        message.getCreatedAtEpoch(),
                         message.getType().name(),
                         message.getIntegrityStatus()
                 )
@@ -144,9 +150,12 @@ public class MessageController {
             );
         }
 
+        long now = System.currentTimeMillis();
+
         message.setSender(sender);
         message.setRoomId(roomId);
-        message.setTimestamp(LocalTime.now().format(formatter));
+        message.setCreatedAtEpoch(now);
+        message.setTimestamp(formatTimestamp(now));
         message.setIntegrityHash(null);
         message.setSecretKey(null);
         message.setIntegrityStatus("SYSTEM");
@@ -167,20 +176,30 @@ public class MessageController {
     @GetMapping("/history")
     @ResponseBody
     public List<ChatMessageEntity> getChatHistory(@RequestParam String roomId) {
-        return chatMessageRepository.findByRoomIdOrderByTimestampAsc(roomId);
+        return chatMessageRepository.findByRoomIdOrderByCreatedAtEpochAsc(roomId);
     }
 
     private ChatMessage buildSystemMessage(String roomId, String sender, String content, String status) {
+        long now = System.currentTimeMillis();
+
         ChatMessage message = new ChatMessage();
         message.setSender(sender);
         message.setRoomId(roomId);
         message.setContent(content);
-        message.setTimestamp(LocalTime.now().format(formatter));
+        message.setCreatedAtEpoch(now);
+        message.setTimestamp(formatTimestamp(now));
         message.setType(ChatMessage.MessageType.CHAT);
         message.setIntegrityStatus(status);
         message.setIntegrityHash(null);
         message.setSecretKey(null);
         return message;
+    }
+
+    private String formatTimestamp(long epochMillis) {
+        return LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(epochMillis),
+                ZoneId.systemDefault()
+        ).format(formatter);
     }
 
     private String safeTrim(String value) {

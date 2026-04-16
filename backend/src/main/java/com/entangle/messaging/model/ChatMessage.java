@@ -14,6 +14,7 @@ public class ChatMessage {
     private String sender;
     private String roomId;
     private String timestamp;
+    private Long createdAtEpoch;
 
     // Integrity fields
     private String integrityHash;
@@ -24,12 +25,13 @@ public class ChatMessage {
     }
 
     public ChatMessage(MessageType type, String content, String sender, String roomId, String timestamp,
-                       String integrityHash, String integrityStatus, String secretKey) {
+                       Long createdAtEpoch, String integrityHash, String integrityStatus, String secretKey) {
         this.type = type;
         this.content = content;
         this.sender = sender;
         this.roomId = roomId;
         this.timestamp = timestamp;
+        this.createdAtEpoch = createdAtEpoch;
         this.integrityHash = integrityHash;
         this.integrityStatus = integrityStatus;
         this.secretKey = secretKey;
@@ -73,6 +75,14 @@ public class ChatMessage {
 
     public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public Long getCreatedAtEpoch() {
+        return createdAtEpoch;
+    }
+
+    public void setCreatedAtEpoch(Long createdAtEpoch) {
+        this.createdAtEpoch = createdAtEpoch;
     }
 
     public String getIntegrityHash() {

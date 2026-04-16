@@ -8,5 +8,5 @@ import com.entangle.messaging.model.ChatMessageEntity;
 
 public interface ChatMessageRepository extends MongoRepository<ChatMessageEntity, String> {
 
-    List<ChatMessageEntity> findByRoomIdOrderByTimestampAsc(String roomId);
+    List<ChatMessageEntity> findByRoomIdOrderByCreatedAtEpochAsc(String roomId);
 }

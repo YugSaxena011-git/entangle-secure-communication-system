@@ -13,6 +13,7 @@ public class ChatMessageEntity {
     private String content;
     private String roomId;
     private String timestamp;
+    private Long createdAtEpoch;
     private String type;
     private String integrityStatus;
 
@@ -20,11 +21,12 @@ public class ChatMessageEntity {
     }
 
     public ChatMessageEntity(String sender, String content, String roomId,
-                             String timestamp, String type, String integrityStatus) {
+                             String timestamp, Long createdAtEpoch, String type, String integrityStatus) {
         this.sender = sender;
         this.content = content;
         this.roomId = roomId;
         this.timestamp = timestamp;
+        this.createdAtEpoch = createdAtEpoch;
         this.type = type;
         this.integrityStatus = integrityStatus;
     }
@@ -47,6 +49,10 @@ public class ChatMessageEntity {
 
     public String getTimestamp() {
         return timestamp;
+    }
+
+    public Long getCreatedAtEpoch() {
+        return createdAtEpoch;
     }
 
     public String getType() {
