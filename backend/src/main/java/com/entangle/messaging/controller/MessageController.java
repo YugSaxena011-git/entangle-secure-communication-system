@@ -25,7 +25,9 @@ import com.entangle.messaging.stats.ChatStatsService;
 @Controller
 public class MessageController {
 
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Kolkata");
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     private final ChatStatsService chatStatsService;
     private final ChatMessageRepository chatMessageRepository;
     private final RoomService roomService;
@@ -198,7 +200,7 @@ public class MessageController {
     private String formatTimestamp(long epochMillis) {
         return LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(epochMillis),
-                ZoneId.systemDefault()
+                APP_ZONE
         ).format(formatter);
     }
 
@@ -208,11 +210,7 @@ public class MessageController {
 
     private String safeValue(String value, String fallback) {
         String trimmed = safeTrim(value);
-        return trimmed.isEmpty() ? fallback : fallbackIfBlank(trimmed, fallback);
-    }
-
-    private String fallbackIfBlank(String value, String fallback) {
-        return value.isEmpty() ? fallback : value;
+        return trimmed.isEmpty() ? fallback : trimmed;
     }
 
     private String buildIntegrityBase(String sender, String content, String roomId, String type, String secretKey) {

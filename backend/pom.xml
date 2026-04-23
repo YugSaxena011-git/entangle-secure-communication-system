@@ -41,10 +41,16 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
-        <!-- MongoDB (NEW - IMPORTANT) -->
+        <!-- MongoDB -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
+
+        <!-- BCrypt password hashing -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
         <!-- DevTools -->
