@@ -78,9 +78,16 @@ public class MessageController {
 
         if (message.getType() == ChatMessage.MessageType.PRIORITY) {
             message.setType(ChatMessage.MessageType.PRIORITY);
+            message.setOneTime(false);
+        } else if (message.getType() == ChatMessage.MessageType.ONE_TIME) {
+            message.setType(ChatMessage.MessageType.ONE_TIME);
+            message.setOneTime(true);
         } else {
             message.setType(ChatMessage.MessageType.CHAT);
+            message.setOneTime(false);
         }
+
+        message.setConsumed(false);
 
         String serverHashInput = buildIntegrityBase(
                 message.getSender(),
@@ -113,7 +120,9 @@ public class MessageController {
                         message.getTimestamp(),
                         message.getCreatedAtEpoch(),
                         message.getType().name(),
-                        message.getIntegrityStatus()
+                        message.getIntegrityStatus(),
+                        message.isOneTime(),
+                        message.isConsumed()
                 )
         );
 
@@ -161,6 +170,8 @@ public class MessageController {
         message.setIntegrityHash(null);
         message.setSecretKey(null);
         message.setIntegrityStatus("SYSTEM");
+        message.setOneTime(false);
+        message.setConsumed(false);
 
         if (message.getType() == ChatMessage.MessageType.JOIN) {
             message.setContent(sender + " joined room [" + roomId + "]");
@@ -194,6 +205,8 @@ public class MessageController {
         message.setIntegrityStatus(status);
         message.setIntegrityHash(null);
         message.setSecretKey(null);
+        message.setOneTime(false);
+        message.setConsumed(false);
         return message;
     }
 

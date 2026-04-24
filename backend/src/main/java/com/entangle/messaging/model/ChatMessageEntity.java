@@ -16,12 +16,15 @@ public class ChatMessageEntity {
     private Long createdAtEpoch;
     private String type;
     private String integrityStatus;
+    private boolean oneTime;
+    private boolean consumed;
 
     public ChatMessageEntity() {
     }
 
     public ChatMessageEntity(String sender, String content, String roomId,
-                             String timestamp, Long createdAtEpoch, String type, String integrityStatus) {
+                             String timestamp, Long createdAtEpoch, String type,
+                             String integrityStatus, boolean oneTime, boolean consumed) {
         this.sender = sender;
         this.content = content;
         this.roomId = roomId;
@@ -29,6 +32,8 @@ public class ChatMessageEntity {
         this.createdAtEpoch = createdAtEpoch;
         this.type = type;
         this.integrityStatus = integrityStatus;
+        this.oneTime = oneTime;
+        this.consumed = consumed;
     }
 
     public String getId() {
@@ -61,5 +66,13 @@ public class ChatMessageEntity {
 
     public String getIntegrityStatus() {
         return integrityStatus;
+    }
+
+    public boolean isOneTime() {
+        return oneTime;
+    }
+
+    public boolean isConsumed() {
+        return consumed;
     }
 }

@@ -6,7 +6,8 @@ public class ChatMessage {
         CHAT,
         JOIN,
         LEAVE,
-        PRIORITY
+        PRIORITY,
+        ONE_TIME
     }
 
     private MessageType type;
@@ -16,16 +17,19 @@ public class ChatMessage {
     private String timestamp;
     private Long createdAtEpoch;
 
-    // Integrity fields
     private String integrityHash;
     private String integrityStatus;
     private String secretKey;
+
+    private boolean oneTime;
+    private boolean consumed;
 
     public ChatMessage() {
     }
 
     public ChatMessage(MessageType type, String content, String sender, String roomId, String timestamp,
-                       Long createdAtEpoch, String integrityHash, String integrityStatus, String secretKey) {
+                       Long createdAtEpoch, String integrityHash, String integrityStatus, String secretKey,
+                       boolean oneTime, boolean consumed) {
         this.type = type;
         this.content = content;
         this.sender = sender;
@@ -35,6 +39,8 @@ public class ChatMessage {
         this.integrityHash = integrityHash;
         this.integrityStatus = integrityStatus;
         this.secretKey = secretKey;
+        this.oneTime = oneTime;
+        this.consumed = consumed;
     }
 
     public MessageType getType() {
@@ -107,5 +113,21 @@ public class ChatMessage {
 
     public void setSecretKey(String secretKey) {
         this.secretKey = secretKey;
+    }
+
+    public boolean isOneTime() {
+        return oneTime;
+    }
+
+    public void setOneTime(boolean oneTime) {
+        this.oneTime = oneTime;
+    }
+
+    public boolean isConsumed() {
+        return consumed;
+    }
+
+    public void setConsumed(boolean consumed) {
+        this.consumed = consumed;
     }
 }

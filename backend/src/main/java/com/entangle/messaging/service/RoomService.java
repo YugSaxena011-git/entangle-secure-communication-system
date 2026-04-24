@@ -11,51 +11,59 @@ public class RoomService {
     private final ConcurrentHashMap<String, Integer> suspiciousAttempts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> joinLockedRooms = new ConcurrentHashMap<>();
 
-    private static final int MAX_SUSPICIOUS_ATTEMPTS = 3;
+    private static final int MAX_SUSPICIOUS_ATTEMPTS = 5;
 
     public synchronized JoinResult joinRoom(String roomId, String secretKey) {
-        if (!roomSecrets.containsKey(roomId)) {
-            roomSecrets.put(roomId, secretKey);
-            suspiciousAttempts.put(roomId, 0);
-            joinLockedRooms.put(roomId, false);
+        if (roomId == null || roomId.trim().isEmpty()) return JoinResult.DENIED;
+        if (secretKey == null || secretKey.trim().isEmpty()) return JoinResult.DENIED;
+
+        String cleanRoomId = roomId.trim();
+        String cleanSecretKey = secretKey.trim();
+
+        if (isJoinLocked(cleanRoomId)) return JoinResult.JOIN_LOCKED;
+
+        if (!roomSecrets.containsKey(cleanRoomId)) {
+            roomSecrets.put(cleanRoomId, cleanSecretKey);
+            suspiciousAttempts.put(cleanRoomId, 0);
+            joinLockedRooms.put(cleanRoomId, false);
             return JoinResult.ALLOWED;
         }
 
-        boolean correctKey = roomSecrets.get(roomId).equals(secretKey);
-
-        if (correctKey) {
+        if (roomSecrets.get(cleanRoomId).equals(cleanSecretKey)) {
+            suspiciousAttempts.put(cleanRoomId, 0);
             return JoinResult.ALLOWED;
         }
 
-        registerSuspiciousAttempt(roomId);
-
-        if (isJoinLocked(roomId)) {
-            return JoinResult.JOIN_LOCKED;
-        }
-
-        return JoinResult.DENIED;
+        registerSuspiciousAttempt(cleanRoomId);
+        return isJoinLocked(cleanRoomId) ? JoinResult.JOIN_LOCKED : JoinResult.DENIED;
     }
 
     public synchronized AccessResult validateMessageAccess(String roomId, String secretKey) {
-        if (!roomSecrets.containsKey(roomId)) {
-            return AccessResult.DENIED;
-        }
+        if (roomId == null || roomId.trim().isEmpty()) return AccessResult.DENIED;
+        if (secretKey == null || secretKey.trim().isEmpty()) return AccessResult.DENIED;
 
-        if (isJoinLocked(roomId)) {
-            return AccessResult.DENIED;
-        }
+        String cleanRoomId = roomId.trim();
+        String cleanSecretKey = secretKey.trim();
 
-        boolean correctKey = roomSecrets.get(roomId).equals(secretKey);
+        if (isJoinLocked(cleanRoomId)) return AccessResult.DENIED;
 
-        if (correctKey) {
+        if (!roomSecrets.containsKey(cleanRoomId)) {
+            roomSecrets.put(cleanRoomId, cleanSecretKey);
+            suspiciousAttempts.put(cleanRoomId, 0);
+            joinLockedRooms.put(cleanRoomId, false);
             return AccessResult.ALLOWED;
         }
 
+        if (roomSecrets.get(cleanRoomId).equals(cleanSecretKey)) {
+            return AccessResult.ALLOWED;
+        }
+
+        registerSuspiciousAttempt(cleanRoomId);
         return AccessResult.DENIED;
     }
 
     public synchronized void registerTamperEvent(String roomId) {
-        registerSuspiciousAttempt(roomId);
+        if (roomId != null) registerSuspiciousAttempt(roomId.trim());
     }
 
     public synchronized boolean isJoinLocked(String roomId) {
