@@ -44,6 +44,10 @@ public class ChatMessageEntity {
         return sender;
     }
 
+    public void setContent(String content) {
+        this.content = content;
+    }
+
     public String getContent() {
         return content;
     }
@@ -70,6 +74,10 @@ public class ChatMessageEntity {
 
     public boolean isOneTime() {
         return oneTime;
+    }
+
+    public void setConsumed(boolean consumed) {
+        this.consumed = consumed;
     }
 
     public boolean isConsumed() {

@@ -12,6 +12,7 @@ import java.util.List;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -190,6 +191,30 @@ public class MessageController {
     @ResponseBody
     public List<ChatMessageEntity> getChatHistory(@RequestParam String roomId) {
         return chatMessageRepository.findByRoomIdOrderByCreatedAtEpochAsc(roomId);
+    }
+
+    @DeleteMapping("/consume")
+    @ResponseBody
+    public void consumeMessage(@RequestParam(required = false) String id,
+                               @RequestParam(required = false) String roomId,
+                               @RequestParam(required = false) Long epoch) {
+        if (id != null && !id.isEmpty() && !"undefined".equals(id)) {
+            chatMessageRepository.findById(id).ifPresent(msg -> {
+                msg.setContent("[PURGED]");
+                msg.setConsumed(true);
+                chatMessageRepository.save(msg);
+            });
+        } else if (roomId != null && epoch != null) {
+            chatMessageRepository.findByRoomIdOrderByCreatedAtEpochAsc(roomId)
+                .stream()
+                .filter(m -> epoch.equals(m.getCreatedAtEpoch()))
+                .findFirst()
+                .ifPresent(msg -> {
+                    msg.setContent("[PURGED]");
+                    msg.setConsumed(true);
+                    chatMessageRepository.save(msg);
+                });
+        }
     }
 
     private ChatMessage buildSystemMessage(String roomId, String sender, String content, String status) {
